@@ -9,6 +9,17 @@ document.addEventListener('DOMContentLoaded', function () {
       sendBtn: document.getElementById('sendBtn')
     };
 
+    function getOrCreateSessionId() {
+      let sessionId = localStorage.getItem("sessionId");
+
+      if(sessionId) {
+        sessionId = crypto.randomUUID();
+        localStorage.setItem("sessionId", sessionId);
+      }
+
+      return sessionId;
+    }
+
     let conversation = [];
   
     elements.clearChatBtn.addEventListener('click', function () {
@@ -42,10 +53,11 @@ document.addEventListener('DOMContentLoaded', function () {
       setSendingState(true);
 
       try {
-        const res = await fetch('https://multiplicatively-stumpless-wes.ngrok-free.dev/webhook-test/chat', {
+        const sessionId = getOrCreateSessionId();
+        const res = await fetch('https://multiplicatively-stumpless-wes.ngrok-free.dev/webhook/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: text }) 
+          body: JSON.stringify({ message: text, sessionId: sessionId }) 
         });
 
         const data = await res.json();
