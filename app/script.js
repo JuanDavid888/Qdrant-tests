@@ -1,191 +1,250 @@
 document.addEventListener('DOMContentLoaded', function () {
-
+  // Elementos DOM
   const elements = {
+    modelSelect: document.getElementById('modelSelect'),
+    clearChatBtn: document.getElementById('clearChatBtn'),
     messages: document.getElementById('messages'),
     composer: document.getElementById('composer'),
     prompt: document.getElementById('prompt'),
     sendBtn: document.getElementById('sendBtn'),
-    sessionsList: document.getElementById('sessionsList'),
     newChatBtn: document.getElementById('newChatBtn'),
-    modelSelect: document.getElementById('modelSelect')
+    sessionsList: document.getElementById('sessionsList'),
+    openSidebarBtn: document.getElementById('openSidebar'),
+    closeSidebarBtn: document.getElementById('closeSidebar'),
+    appContainer: document.getElementById('appContainer'),
   };
 
-  function getSessions() {
-    return JSON.parse(localStorage.getItem("chatSessions")) || [];
-  }
+  // Variables globales
+  let conversation = [];
 
-  function saveSessions(sessions) {
-    localStorage.setItem("chatSessions", JSON.stringify(sessions));
-  }
+  // Chats guardados en localStorage con estructura [{id, name, date, conversation}]
+  let chats = JSON.parse(localStorage.getItem('chats') || '[]');
+  let activeSessionId = localStorage.getItem('activeSessionId') || null;
 
-  function getActiveSessionId() {
-    return localStorage.getItem("activeSessionId");
-  }
-
-  function setActiveSessionId(id) {
-    localStorage.setItem("activeSessionId", id);
-  }
-
-  function createNewSession() {
-    const id = crypto.randomUUID();
-
-    const newSession = {
-      id,
-      title: "Nuevo chat",
-      date: new Date().toISOString(),
-      model: elements.modelSelect.value,
-      conversation: []
-    };
-
-    const sessions = getSessions();
-    sessions.unshift(newSession);
-    saveSessions(sessions);
-    setActiveSessionId(id);
-
-    loadSession(id);
-    renderSessions();
-  }
-
-  function loadSession(id) {
-    const sessions = getSessions();
-    const session = sessions.find(s => s.id === id);
-    if (!session) return;
-
-    setActiveSessionId(id);
-    conversation = session.conversation || [];
-    elements.modelSelect.value = session.model || "gemini-2.5-flash";
-
-    renderMessages();
-    renderSessions();
-  }
-
-  function deleteSession(id) {
-    let sessions = getSessions();
-    sessions = sessions.filter(s => s.id !== id);
-    saveSessions(sessions);
-
-    if (getActiveSessionId() === id) {
-      if (sessions.length > 0) {
-        loadSession(sessions[0].id);
-      } else {
-        createNewSession();
-      }
-    }
-
-    renderSessions();
-  }
-
-  function updateActiveSession() {
-    const sessions = getSessions();
-    const id = getActiveSessionId();
-    const index = sessions.findIndex(s => s.id === id);
-    if (index === -1) return;
-
-    sessions[index].conversation = conversation;
-    sessions[index].model = elements.modelSelect.value;
-
-    if (conversation.length === 1) {
-      sessions[index].title = conversation[0].parts[0].text.slice(0, 30);
-    }
-
-    saveSessions(sessions);
-    renderSessions();
+  // Funciones para guardar y cargar chats
+  function saveChats() {
+    localStorage.setItem('chats', JSON.stringify(chats));
+    localStorage.setItem('activeSessionId', activeSessionId);
   }
 
   function renderSessions() {
-    const sessions = getSessions();
-    const activeId = getActiveSessionId();
-
-    elements.sessionsList.innerHTML = "";
-
-    sessions.forEach(session => {
-      const div = document.createElement("div");
-      div.className = "session-item" + (session.id === activeId ? " active" : "");
+    elements.sessionsList.innerHTML = '';
+    chats.forEach(({ id, name, date }) => {
+      const div = document.createElement('div');
+      div.className = 'session-item';
+      if (id === activeSessionId) div.classList.add('active');
+      div.dataset.id = id;
 
       div.innerHTML = `
-        ${session.title}
-        <span class="delete-btn">✕</span>
-        <small>${new Date(session.date).toLocaleString()}</small>
+        <div>${name}</div>
+        <small>${new Date(date).toLocaleString()}</small>
+        <span class="delete-btn" title="Eliminar chat">×</span>
       `;
-
-      div.onclick = () => loadSession(session.id);
-
-      div.querySelector(".delete-btn").onclick = (e) => {
-        e.stopPropagation();
-        deleteSession(session.id);
-      };
 
       elements.sessionsList.appendChild(div);
     });
   }
 
-  function renderMessages() {
-    elements.messages.innerHTML = "";
+  function loadConversation(id) {
+    const chat = chats.find((c) => c.id === id);
+    if (!chat) return;
+    conversation = chat.conversation || [];
+    renderMessages();
+  }
 
-    conversation.forEach(msg => {
-      const wrapper = document.createElement("div");
-      wrapper.className = "message " + msg.role;
+  function saveConversation() {
+    const chat = chats.find((c) => c.id === activeSessionId);
+    if (!chat) return;
+    chat.conversation = conversation;
+    chat.date = Date.now();
+    saveChats();
+    renderSessions();
+  }
 
-      const avatar = document.createElement("div");
-      avatar.className = "avatar";
-      avatar.textContent = msg.role === "user" ? "Tú" : "G";
+  // Crear nuevo chat con numeración automática
+  function createNewChat() {
+    // Obtener el mayor número en nombres de chats actuales
+    const maxNum = chats.reduce((max, c) => {
+      const match = c.name.match(/chat (\d+)/i);
+      return match ? Math.max(max, parseInt(match[1], 10)) : max;
+    }, 0);
+    const newNum = maxNum + 1;
 
-      const bubble = document.createElement("div");
-      bubble.className = "bubble";
-      bubble.textContent = msg.parts[0].text;
+    const newId = crypto.randomUUID();
+    const newChat = {
+      id: newId,
+      name: `Chat ${newNum}`,
+      date: Date.now(),
+      conversation: [],
+    };
+    chats.push(newChat);
+    activeSessionId = newId;
+    saveChats();
+    renderSessions();
+    loadConversation(newId);
+  }
+
+  // Inicialización al cargar página
+  if (chats.length === 0) {
+    createNewChat();
+  } else if (activeSessionId) {
+    loadConversation(activeSessionId);
+  } else {
+    createNewChat();
+  }
+
+  // Eventos
+
+  // Toggle sidebar
+  elements.openSidebarBtn.addEventListener('click', () => {
+    elements.appContainer.classList.remove('sidebar-collapsed');
+  });
+
+  elements.closeSidebarBtn.addEventListener('click', () => {
+    elements.appContainer.classList.add('sidebar-collapsed');
+  });
+
+  // Nuevo chat
+  elements.newChatBtn.addEventListener('click', () => {
+    createNewChat();
+  });
+
+  // Selección y borrado de chats
+  elements.sessionsList.addEventListener('click', (e) => {
+    if (e.target.classList.contains('delete-btn')) {
+      // Borrar chat
+      const idToDelete = e.target.parentElement.dataset.id;
+      chats = chats.filter((c) => c.id !== idToDelete);
+
+      if (idToDelete === activeSessionId) {
+        if (chats.length > 0) {
+          activeSessionId = chats[0].id;
+          loadConversation(activeSessionId);
+        } else {
+          createNewChat();
+        }
+      }
+      saveChats();
+      renderSessions();
+      return;
+    }
+
+    // Cambiar chat activo
+    const sessionDiv = e.target.closest('.session-item');
+    if (
+      sessionDiv &&
+      sessionDiv.dataset.id &&
+      sessionDiv.dataset.id !== activeSessionId
+    ) {
+      activeSessionId = sessionDiv.dataset.id;
+      loadConversation(activeSessionId);
+      saveChats();
+    }
+  });
+
+  // Ajusta altura textarea al escribir
+  elements.prompt.addEventListener('input', function () {
+    elements.prompt.style.height = 'auto';
+    let newHeight = elements.prompt.scrollHeight;
+    if (newHeight > 200) {
+      newHeight = 200;
+    }
+    elements.prompt.style.height = newHeight + 'px';
+  });
+
+  // Enviar mensaje y actualizar conversación
+  elements.composer.addEventListener('submit', async function (e) {
+    e.preventDefault();
+
+    let text = elements.prompt.value?.trim();
+    if (!text) return;
+
+    appendMessage('user', text, false);
+    elements.prompt.value = '';
+    elements.prompt.style.height = 'auto';
+    setSendingState(true);
+
+    try {
+      // Aquí debes adaptar sessionId si usas uno distinto
+      const sessionId = activeSessionId || crypto.randomUUID();
+
+      const res = await fetch(
+        'https://multiplicatively-stumpless-wes.ngrok-free.dev/webhook/chat',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: text, sessionId: sessionId }),
+        }
+      );
+
+      const data = await res.json();
+
+      if (data.output) {
+        appendMessage('model', data.output, false);
+      } else {
+        appendMessage('model', 'No se recibió respuesta del servidor.', true);
+      }
+    } catch (err) {
+      appendMessage('model', 'Error de conexión con el backend.', true);
+    }
+
+    setSendingState(false);
+  });
+
+  // Guardar la conversación y mostrarla
+  function appendMessage(role, text, isError) {
+    conversation.push({ role: role, parts: [{ text: text }] });
+    renderMessages(isError ? conversation.length - 1 : null, isError);
+    scrollToBottom();
+    saveConversation();
+  }
+
+  // Renderiza mensajes
+  function renderMessages(errorIndex, isError) {
+    elements.messages.innerHTML = '';
+    conversation.forEach((msg, i) => {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'message ' + (msg.role === 'user' ? 'user' : 'model');
+
+      const avatar = document.createElement('div');
+      avatar.className = 'avatar';
+      avatar.textContent = msg.role === 'user' ? 'Tú' : 'G';
+
+      const bubble = document.createElement('div');
+      bubble.className = 'bubble';
+      if (isError && i === errorIndex) {
+        bubble.classList.add('error');
+      }
+
+      let bubbleText = '';
+      if (msg && msg.parts && msg.parts[0] && msg.parts[0].text) {
+        bubbleText = msg.parts[0].text;
+      }
+      bubble.textContent = bubbleText;
 
       wrapper.appendChild(avatar);
       wrapper.appendChild(bubble);
       elements.messages.appendChild(wrapper);
     });
+  }
 
+  // Desplaza scroll hacia abajo
+  function scrollToBottom() {
     elements.messages.scrollTop = elements.messages.scrollHeight;
   }
 
-  let conversation = [];
+  // Estados de envío
+  function setSendingState(isSending) {
+    elements.sendBtn.disabled = isSending;
+    elements.prompt.disabled = isSending;
+  }
 
-  function appendMessage(role, text) {
-    conversation.push({ role, parts: [{ text }] });
-    updateActiveSession();
+  // Borrar conversación actual
+  elements.clearChatBtn.addEventListener('click', function () {
+    let confirmDelete = confirm('¿Borrar toda la conversación?');
+    if (!confirmDelete) return;
+    conversation = [];
     renderMessages();
-  }
-
-  elements.composer.addEventListener("submit", async (e) => {
-    e.preventDefault();
-
-    const text = elements.prompt.value.trim();
-    if (!text) return;
-
-    appendMessage("user", text);
-    elements.prompt.value = "";
-
-    try {
-      const res = await fetch("https://multiplicatively-stumpless-wes.ngrok-free.dev/webhook/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: text,
-          sessionId: getActiveSessionId(),
-          model: elements.modelSelect.value
-        })
-      });
-
-      const data = await res.json();
-      appendMessage("model", data.output || "Sin respuesta.");
-
-    } catch {
-      appendMessage("model", "Error de conexión.");
-    }
+    saveConversation();
   });
-
-  elements.newChatBtn.addEventListener("click", createNewSession);
-
-  if (!getActiveSessionId()) {
-    createNewSession();
-  } else {
-    loadSession(getActiveSessionId());
-  }
-
-  renderSessions();
-
 });

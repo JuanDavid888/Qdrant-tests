@@ -2,33 +2,84 @@
   box-sizing: border-box;
 }
 
-html, body {
+html,
+body {
   margin: 0;
   height: 100%;
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial,
+    sans-serif;
   background: #111;
   color: #f5f5f5;
 }
 
-/* Layout */
+/* App container grid */
 .app-container {
   display: grid;
   grid-template-columns: 260px 1fr;
   height: 100vh;
+  transition: all 0.3s ease;
 }
 
-/* ================= SIDEBAR ================= */
-
+/* Sidebar */
 .sidebar {
   background: #141414;
   border-right: 1px solid #2a2a2a;
-  padding: 10px;
+  padding: 0;
   display: flex;
   flex-direction: column;
   gap: 10px;
   overflow-y: auto;
+  transition: all 0.3s ease;
 }
 
+/* Sidebar collapsed */
+.app-container.sidebar-collapsed {
+  grid-template-columns: 0 1fr;
+}
+
+.app-container.sidebar-collapsed .sidebar {
+  overflow: hidden;
+  padding: 0;
+  border: none;
+}
+
+/* Sidebar header */
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid #2a2a2a;
+  gap: 12px;
+  background: #1a1a1a;
+}
+
+.sidebar-header .brand-logo {
+  height: 60px;
+  width: auto;
+  user-select: none;
+  display: block;
+}
+
+.icon-btn {
+  background: transparent;
+  border: 1px solid #2a2a2a;
+  color: white;
+  padding: 6px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  user-select: none;
+  transition: background-color 0.2s ease;
+}
+
+.icon-btn:hover {
+  background-color: #2a3f6b;
+  border-color: #2a3f6b;
+}
+
+/* New Chat Button */
 .new-chat {
   background: #3b82f6;
   border: none;
@@ -37,21 +88,27 @@ html, body {
   color: white;
   cursor: pointer;
   font-weight: 600;
+  margin: 8px 16px;
 }
 
+/* Sessions list */
 .sessions-list {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  padding: 0 8px 12px 8px;
+  flex-grow: 1;
+  overflow-y: auto;
 }
 
 .session-item {
-  padding: 8px;
+  padding: 8px 12px;
   background: #1c1c1c;
   border-radius: 6px;
   cursor: pointer;
   font-size: 13px;
   position: relative;
+  user-select: none;
 }
 
 .session-item.active {
@@ -62,23 +119,24 @@ html, body {
   display: block;
   font-size: 11px;
   opacity: 0.6;
+  margin-top: 2px;
 }
 
 .delete-btn {
   position: absolute;
   right: 8px;
   top: 8px;
-  font-size: 11px;
+  font-size: 14px;
   cursor: pointer;
   opacity: 0.6;
+  user-select: none;
 }
 
 .delete-btn:hover {
   opacity: 1;
 }
 
-/* ================= HEADER ================= */
-
+/* Header */
 .app-header {
   display: flex;
   align-items: center;
@@ -88,11 +146,18 @@ html, body {
   border-bottom: 1px solid #2a2a2a;
 }
 
-.brand-logo {
-  height: 36px;
+.left-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
-select {
+.brand-logo-header {
+  height: 32px;
+  width: auto;
+}
+
+select#modelSelect {
   background: #1f1f1f;
   border: 1px solid #2a2a2a;
   color: #f5f5f5;
@@ -100,8 +165,27 @@ select {
   border-radius: 6px;
 }
 
-/* ================= CHAT ================= */
+button {
+  background: #3b82f6;
+  color: #fff;
+  border: none;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
 
+button.ghost {
+  background: transparent;
+  color: #cfcfcf;
+  border: 1px solid #2a2a2a;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Chat */
 .main-area {
   display: grid;
   grid-template-rows: auto 1fr;
@@ -111,6 +195,7 @@ select {
   display: grid;
   grid-template-rows: 1fr auto;
   padding: 10px;
+  height: 100%;
 }
 
 .messages {
@@ -118,14 +203,12 @@ select {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding-right: 5px;
 }
 
 .message {
   display: grid;
   grid-template-columns: 32px 1fr;
   gap: 8px;
-  align-items: flex-start;
 }
 
 .avatar {
@@ -138,6 +221,7 @@ select {
   place-items: center;
   font-size: 12px;
   font-weight: bold;
+  user-select: none;
 }
 
 .bubble {
@@ -146,6 +230,7 @@ select {
   padding: 8px 10px;
   border-radius: 8px;
   white-space: pre-wrap;
+  user-select: text;
 }
 
 .message.user .bubble {
@@ -153,8 +238,7 @@ select {
   border-color: #2a3f6b;
 }
 
-/* ================= COMPOSER ================= */
-
+/* Composer */
 .composer {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -170,22 +254,14 @@ select {
   background: #1b1b1b;
   border: 1px solid #2a2a2a;
   color: #f5f5f5;
-  padding: 8px 10px;
+  padding: 8px;
   border-radius: 6px;
   min-height: 40px;
   max-height: 180px;
+  font-family: inherit;
 }
 
-button {
-  background: #3b82f6;
-  border: none;
-  padding: 6px 12px;
-  border-radius: 6px;
-  color: white;
-  cursor: pointer;
-}
-
-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+/* Estados */
+.error {
+  color: #ff6b6b;
 }
