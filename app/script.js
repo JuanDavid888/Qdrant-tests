@@ -1,177 +1,191 @@
-
 document.addEventListener('DOMContentLoaded', function () {
-    let elements = {
-      modelSelect: document.getElementById('modelSelect'),
-      clearChatBtn: document.getElementById('clearChatBtn'),
-      messages: document.getElementById('messages'),
-      composer: document.getElementById('composer'),
-      prompt: document.getElementById('prompt'),
-      sendBtn: document.getElementById('sendBtn')
+
+  const elements = {
+    messages: document.getElementById('messages'),
+    composer: document.getElementById('composer'),
+    prompt: document.getElementById('prompt'),
+    sendBtn: document.getElementById('sendBtn'),
+    sessionsList: document.getElementById('sessionsList'),
+    newChatBtn: document.getElementById('newChatBtn'),
+    modelSelect: document.getElementById('modelSelect')
+  };
+
+  function getSessions() {
+    return JSON.parse(localStorage.getItem("chatSessions")) || [];
+  }
+
+  function saveSessions(sessions) {
+    localStorage.setItem("chatSessions", JSON.stringify(sessions));
+  }
+
+  function getActiveSessionId() {
+    return localStorage.getItem("activeSessionId");
+  }
+
+  function setActiveSessionId(id) {
+    localStorage.setItem("activeSessionId", id);
+  }
+
+  function createNewSession() {
+    const id = crypto.randomUUID();
+
+    const newSession = {
+      id,
+      title: "Nuevo chat",
+      date: new Date().toISOString(),
+      model: elements.modelSelect.value,
+      conversation: []
     };
 
-    function getOrCreateSessionId() {
-      let sessionId = localStorage.getItem("sessionId");
+    const sessions = getSessions();
+    sessions.unshift(newSession);
+    saveSessions(sessions);
+    setActiveSessionId(id);
 
-      if(sessionId) {
-        sessionId = crypto.randomUUID();
-        localStorage.setItem("sessionId", sessionId);
-      }
+    loadSession(id);
+    renderSessions();
+  }
 
-      return sessionId;
-    }
+  function loadSession(id) {
+    const sessions = getSessions();
+    const session = sessions.find(s => s.id === id);
+    if (!session) return;
 
-    let conversation = [];
-  
-    elements.clearChatBtn.addEventListener('click', function () {
-      let confirmDelete = confirm('¿Borrar toda la conversación?');
-      if (!confirmDelete) {
-        return;
-      }
-      conversation = [];
-      renderMessages();
-    });
-  
-    elements.prompt.addEventListener('input', function () {
-      elements.prompt.style.height = 'auto';
-      let newHeight = elements.prompt.scrollHeight;
-      if (newHeight > 200) {
-        newHeight = 200;
-      }
-      elements.prompt.style.height = newHeight + 'px';
-    });
-  
-    elements.composer.addEventListener('submit', async function (e) {
-      e.preventDefault();
+    setActiveSessionId(id);
+    conversation = session.conversation || [];
+    elements.modelSelect.value = session.model || "gemini-2.5-flash";
 
-      let text = elements.prompt.value?.trim();
-      if (!text) return;
+    renderMessages();
+    renderSessions();
+  }
 
-      // Renderizar mensaje del usuario
-      appendMessage('user', text, false);
-      elements.prompt.value = '';
-      elements.prompt.style.height = 'auto';
-      setSendingState(true);
+  function deleteSession(id) {
+    let sessions = getSessions();
+    sessions = sessions.filter(s => s.id !== id);
+    saveSessions(sessions);
 
-      try {
-        const sessionId = getOrCreateSessionId();
-        const res = await fetch('https://multiplicatively-stumpless-wes.ngrok-free.dev/webhook/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: text, sessionId: sessionId }) 
-        });
-
-        const data = await res.json();
-
-        if (data.output) {
-          appendMessage('model', data.output, false);
-        } else {
-          appendMessage('model', 'No se recibió respuesta del servidor.', true);
-        }
-      } catch (err) {
-        appendMessage('model', 'Error de conexión con el backend.', true);
-      }
-
-      setSendingState(false);
-    });
-
-  
-    function setSendingState(isSending) {
-      elements.sendBtn.disabled = isSending;
-      elements.prompt.disabled = isSending;
-    }
-  
-    function appendMessage(role, text, isError) {
-      conversation.push({ role: role, parts: [{ text: text }] });
-      renderMessages(isError ? (conversation.length - 1) : null, isError);
-      scrollToBottom();
-    }
-  
-    function renderMessages(errorIndex, isError) {
-      elements.messages.innerHTML = '';
-      let i = 0;
-      while (i < conversation.length) {
-        let msg = conversation[i];
-        let wrapper = document.createElement('div');
-        wrapper.className = 'message ' + (msg.role === 'user' ? 'user' : 'model');
-  
-        let avatar = document.createElement('div');
-        avatar.className = 'avatar';
-        avatar.textContent = msg.role === 'user' ? 'Tú' : 'G';
-  
-        let bubble = document.createElement('div');
-        bubble.className = 'bubble';
-        if (isError && i === errorIndex) {
-          bubble.className += ' error';
-        }
-  
-        let bubbleText = '';
-        if (msg && msg.parts && msg.parts[0] && msg.parts[0].text) {
-          bubbleText = msg.parts[0].text;
-        }
-        bubble.textContent = bubbleText;
-  
-        wrapper.appendChild(avatar);
-        wrapper.appendChild(bubble);
-        elements.messages.appendChild(wrapper);
-  
-        i = i + 1;
+    if (getActiveSessionId() === id) {
+      if (sessions.length > 0) {
+        loadSession(sessions[0].id);
+      } else {
+        createNewSession();
       }
     }
-  
-    function scrollToBottom() {
-      elements.messages.scrollTop = elements.messages.scrollHeight;
+
+    renderSessions();
+  }
+
+  function updateActiveSession() {
+    const sessions = getSessions();
+    const id = getActiveSessionId();
+    const index = sessions.findIndex(s => s.id === id);
+    if (index === -1) return;
+
+    sessions[index].conversation = conversation;
+    sessions[index].model = elements.modelSelect.value;
+
+    if (conversation.length === 1) {
+      sessions[index].title = conversation[0].parts[0].text.slice(0, 30);
     }
-  
-    // Llamada básica con XMLHttpRequest
-    function generateContent(apiKey, model, contents, callback) {
-      let url = 'https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) + ':generateContent?key=' + encodeURIComponent(apiKey);
-      let payload = { contents: contents };
-  
-      let xhr = new XMLHttpRequest();
-      xhr.open('POST', url, true);
-      xhr.setRequestHeader('Content-Type', 'application/json');
-  
-      xhr.onreadystatechange = function () {
-        if (xhr.readyState === 4) {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            let data;
-            try {
-              data = JSON.parse(xhr.responseText);
-            } catch (e) {
-              callback('Respuesta no es JSON válido', null);
-              return;
-            }
-  
-            let text = '';
-            if (data && data.candidates && data.candidates[0]) {
-              let candidate = data.candidates[0];
-              if (candidate.content && candidate.content.parts && candidate.content.parts[0]) {
-                text = candidate.content.parts[0].text;
-              }
-            }
-            if (!text) {
-              text = '(sin contenido)';
-            }
-            callback(null, text);
-          } else {
-            let errorMsg = 'HTTP ' + xhr.status;
-            try {
-              let errJson = JSON.parse(xhr.responseText);
-              if (errJson && errJson.error && errJson.error.message) {
-                errorMsg = errorMsg + ': ' + errJson.error.message;
-              }
-            } catch (e2) {
-              // ignore
-            }
-            callback(errorMsg, null);
-          }
-        }
+
+    saveSessions(sessions);
+    renderSessions();
+  }
+
+  function renderSessions() {
+    const sessions = getSessions();
+    const activeId = getActiveSessionId();
+
+    elements.sessionsList.innerHTML = "";
+
+    sessions.forEach(session => {
+      const div = document.createElement("div");
+      div.className = "session-item" + (session.id === activeId ? " active" : "");
+
+      div.innerHTML = `
+        ${session.title}
+        <span class="delete-btn">✕</span>
+        <small>${new Date(session.date).toLocaleString()}</small>
+      `;
+
+      div.onclick = () => loadSession(session.id);
+
+      div.querySelector(".delete-btn").onclick = (e) => {
+        e.stopPropagation();
+        deleteSession(session.id);
       };
-  
-      try {
-        xhr.send(JSON.stringify(payload));
-      } catch (sendErr) {
-        callback('No se pudo enviar la solicitud', null);
-      }
+
+      elements.sessionsList.appendChild(div);
+    });
+  }
+
+  function renderMessages() {
+    elements.messages.innerHTML = "";
+
+    conversation.forEach(msg => {
+      const wrapper = document.createElement("div");
+      wrapper.className = "message " + msg.role;
+
+      const avatar = document.createElement("div");
+      avatar.className = "avatar";
+      avatar.textContent = msg.role === "user" ? "Tú" : "G";
+
+      const bubble = document.createElement("div");
+      bubble.className = "bubble";
+      bubble.textContent = msg.parts[0].text;
+
+      wrapper.appendChild(avatar);
+      wrapper.appendChild(bubble);
+      elements.messages.appendChild(wrapper);
+    });
+
+    elements.messages.scrollTop = elements.messages.scrollHeight;
+  }
+
+  let conversation = [];
+
+  function appendMessage(role, text) {
+    conversation.push({ role, parts: [{ text }] });
+    updateActiveSession();
+    renderMessages();
+  }
+
+  elements.composer.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const text = elements.prompt.value.trim();
+    if (!text) return;
+
+    appendMessage("user", text);
+    elements.prompt.value = "";
+
+    try {
+      const res = await fetch("https://multiplicatively-stumpless-wes.ngrok-free.dev/webhook/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: text,
+          sessionId: getActiveSessionId(),
+          model: elements.modelSelect.value
+        })
+      });
+
+      const data = await res.json();
+      appendMessage("model", data.output || "Sin respuesta.");
+
+    } catch {
+      appendMessage("model", "Error de conexión.");
     }
   });
+
+  elements.newChatBtn.addEventListener("click", createNewSession);
+
+  if (!getActiveSessionId()) {
+    createNewSession();
+  } else {
+    loadSession(getActiveSessionId());
+  }
+
+  renderSessions();
+
+});
